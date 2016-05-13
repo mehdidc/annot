@@ -6,11 +6,13 @@
    <tr>
     <td>Winner</td>
     <td>Loser</td>
+    <td>Datetime</td>
    </tr>
     {% for match in matches %}
       <tr>
         <td><a href='{{ match.left.url }}'>{{ match.left.url | truncate(40) }}</a> </td>
         <td><a href='{{ match.right.url }}'>{{ match.right.url | truncate(40) }}</a></td>
+        <td>{{ match.datetime }}</td>
       </tr>
     {% endfor %}
    </table>

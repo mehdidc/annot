@@ -8,6 +8,7 @@ from  sqlalchemy.sql.expression import func, select
 
 
 DEBUG = True
+IMG_SERVER = 'http://localhost:5001'
 
 app = Flask(__name__)
 db_filename = 'data.db'
@@ -20,58 +21,70 @@ class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     left_id = db.Column(db.Integer, ForeignKey('Image.id'))
     right_id = db.Column(db.Integer, ForeignKey('Image.id'))
+    datetime = Column(DateTime, default=func.now())
+    experiment =  db.Column(db.String(50))
 
     left = relationship('Image', foreign_keys='Match.left_id')
     right = relationship('Image', foreign_keys='Match.right_id')
+
 
 
 class Image(db.Model):
     __tablename__ = 'Image'
 
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(200))
+    url = db.Column(db.String(200), unique=True)
 
     def __repr__(self):
         return '<Image {}>'.format(self.url)
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-
-    if request.method == 'POST':
-        winner = request.form['winner']
-        loser = request.form['loser']
-        if winner and loser:
-            winner = int(winner)
-            loser = int(loser)
-            print('adding a match...')
-            db.session.add(Match(left_id=winner, right_id=loser))
-            db.session.commit()
-
+def random_selector():
     img1, img2 = Image.query.order_by(func.random()).limit(2)
-    return render_template('template.html', 
-                           url1=img1.url, url2=img2.url, 
-                           id1=img1.id, id2=img2.id)
+    return img1, img2
 
-@app.route('/matches')
+def build_experiment(name='', addr='', selector=None):
+    if addr == '':
+        addr = name
+    if selector is None:
+        selector = random_selector
+
+    @app.route('/' + addr, methods=['GET', 'POST'])
+    def page_gen():
+
+        if request.method == 'POST':
+            winner = request.form['winner']
+            loser = request.form['loser']
+            experiment = request.form['experiment']
+            if winner and loser and experiment:
+                winner = int(winner)
+                loser = int(loser)
+                print('Adding a match...')
+                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment))
+                db.session.commit()
+
+        img1, img2 = selector()
+        return render_template('template.html', 
+                               url1=parse(img1.url), url2=parse(img2.url), 
+                               id1=img1.id, id2=img2.id,
+                               experiment=name)
+    return page_gen
+
+def parse(url):
+    return url.format(LOCAL=IMG_SERVER)
+
+@app.route('/matches/')
 def matches():
-    matches = Match.query.all()
-    print(matches)
+    experiment = request.args.get('experiment')
+    if experiment is not None:
+        matches = Match.query.filter_by(experiment=experiment)
+    else:
+        matches = Match.query.all()
     return render_template('matches.html', matches=matches)
 
+random_selection = build_experiment(name='random', selector=random_selector)
 
 if __name__ == '__main__':
     import argparse
-
-    if not os.path.exists(db_filename):
-        db.create_all()
-        nb = 100
-        for i, url in enumerate(open('urls').readlines()):
-            if i == nb:
-                break
-            url = url.replace('\n', '').replace('\t', ' ').split(' ', 2)[1]
-            print(url)
-            db.session.add(Image(url=url))
-        db.session.commit()
     parser = argparse.ArgumentParser(description='WebServer')
     parser.add_argument("--config-module",
                         type=str, help="config filename",
