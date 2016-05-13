@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+    <h1>Could you please choose the image you prefer :</h1>
+    <table cellpadding="10" cellspacing="5">
+      <tr>
+        <td class="image">
+          <form action="" method="POST">
+            <input type="hidden" name="winner" value="{{ id1 }}"/>
+            <input type="hidden" name="loser" value="{{ id2 }}"/>
+            <input type="image" src="{{ url1 }}"/>
+          </form>
+        </td>
+        <td rowspan="2"><h3>Versus</h3></td>
+        <td class="image">
+          <form action="" method="POST">
+            <input type="hidden" name="winner" value="{{ id2 }}"/>
+            <input type="hidden" name="loser" value="{{ id1 }}"/>
+            <input type="image" src="{{ url2 }}"/>
+          </form>
+        </td>
+      </tr>
+    </table>
+
+{% endblock %}
