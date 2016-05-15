@@ -95,5 +95,9 @@ if __name__ == '__main__':
     parser.add_argument("--port",
                         type=int,
                         default=5000)
+    parser.add_argument("--imgserver",
+                        type=str,
+                        default=IMG_SERVER)
     args = parser.parse_args()
+    IMG_SERVER = args.imgserver
     app.run(host=args.host, port=args.port, debug=DEBUG)
