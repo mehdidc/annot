@@ -78,6 +78,7 @@ def build_experiment(name='', addr='', selector=None):
 
 def parse(url):
     return url.format(LOCAL=IMG_SERVER)
+app.jinja_env.filters['parse_url'] = parse
 
 @app.route('/matches/')
 def matches():

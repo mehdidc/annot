@@ -11,8 +11,8 @@
    </tr>
     {% for match in matches %}
       <tr>
-        <td><a href='{{ match.left.url }}'>{{ match.left.url | truncate(40) }}</a> </td>
-        <td><a href='{{ match.right.url }}'>{{ match.right.url | truncate(40) }}</a></td>
+          <td><a href='{{ match.left.url | parse_url }}'>{{ match.left.url | parse_url | truncate(40) }}</a> </td>
+        <td><a href='{{ match.right.url | parse_url }}'>{{ match.right.url | parse_url | truncate(40) }}</a></td>
         <td>{{ match.datetime }}</td>
         <td>{{ match.ip }}</td>
       </tr>
