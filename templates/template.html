@@ -9,9 +9,8 @@
           <form action="" method="POST">
             <input type="hidden" name="winner" value="{{ id1 }}"/>
             <input type="hidden" name="loser" value="{{ id2 }}"/>
-            <input type="image" src="{{ url1 }}" class="img"/>
+            <input type="image" src="{{ url1 }}" class="img-thumbnail"/>
             <input type="hidden" name="experiment" value="{{ experiment }}"/>
-
           </form>
         </td>
         <td rowspan="2"><h3>Versus</h3></td>
@@ -19,9 +18,8 @@
           <form action="" method="POST">
             <input type="hidden" name="winner" value="{{ id2 }}"/>
             <input type="hidden" name="loser" value="{{ id1 }}"/>
+            <input type="image" src="{{ url2 }}" class="img-thumbnail"/>
             <input type="hidden" name="experiment" value="{{ experiment }}"/>
-
-            <input type="image" src="{{ url2 }}" class="img"/>
           </form>
         </td>
       </tr>

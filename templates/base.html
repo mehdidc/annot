@@ -4,13 +4,26 @@
 
   <style type="text/css">
     body { font-family:sans-serif; }
-    td { text-align:center; }
+    table {border-collapse: collapse}
+    td { text-align:center; border: 1px solid black}
     td.image { background-color:#b0c4de; }
     td.image:hover { background-color:#4682b4; }
-    .img {width: 200px; height: 'auto';}
-
+    .imgsmall {width: 700px; height: 700px;}
+    .img {}
   </style>
+  
+  <link href="static/zoomify.css" rel="stylesheet" type="text/css">
+  <script type="text/javascript" src="static/jquery-1.8.3.min.js"></script> 
+  <script type="text/javascript" src="static/zoomify.js"></script> 
+
+  <script>
+  $(document).ready(function(){
+     $('img').zoomify();
+  });
+  </script>
+
 </head>
+
 <body>
   {% block body %}
   {% endblock %}

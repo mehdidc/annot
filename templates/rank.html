@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+   <table style='border:1px solid black;border-collapse: collapse'>
+   <tr>
+    <td>Rank</td>
+    <td>score</td>
+    <td>Image</td>
+   </tr>
+    {% for rank, url, score in rank_url_score %}
+      <tr>
+         <td>{{ rank }}</td>
+         <td>{{ score }}</td>
+         <td><a href="{{ url}}"><img src="{{ url }}"/></a></td>
+      </tr>
+    {% endfor %}
+   </table>
+
+{% endblock %}

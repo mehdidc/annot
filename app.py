@@ -1,14 +1,20 @@
 import os
+from collections import defaultdict
 from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask import render_template
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, relationship
 from  sqlalchemy.sql.expression import func, select
+from trueskill import Rating, quality_1vs1, rate_1vs1
 
+def get_ip():
+    import socket
+    hostname = socket.gethostname()
+    return hostname
 
 DEBUG = True
-IMG_SERVER = 'http://localhost:5001'
+IMG_SERVER = 'http://{}:5001'.format(get_ip())
 
 app = Flask(__name__)
 db_filename = 'data.db'
@@ -23,6 +29,7 @@ class Match(db.Model):
     right_id = db.Column(db.Integer, ForeignKey('Image.id'))
     datetime = Column(DateTime, default=func.now())
     experiment =  db.Column(db.String(50))
+    ip = db.Column(db.String(50))
 
     left = relationship('Image', foreign_keys='Match.left_id')
     right = relationship('Image', foreign_keys='Match.right_id')
@@ -59,7 +66,7 @@ def build_experiment(name='', addr='', selector=None):
                 winner = int(winner)
                 loser = int(loser)
                 print('Adding a match...')
-                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment))
+                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr))
                 db.session.commit()
 
         img1, img2 = selector()
@@ -80,6 +87,23 @@ def matches():
     else:
         matches = Match.query.all()
     return render_template('matches.html', matches=matches)
+
+@app.route('/ranks/')
+def ranks():
+    urls = [image.url for image in Image.query.all()]
+    matches = Match.query.all()
+    matches = [(match.left.url, match.right.url) for match in matches]
+    score = get_scores(matches)
+    urls = sorted(score.keys(), key=lambda url: -score[url])
+    scores = map(lambda url:score[url], urls)
+    urls = map(parse, urls)
+    return render_template('rank.html', rank_url_score=zip(range(1, len(urls) + 1), urls, scores))
+
+def get_scores(matches):
+    rating = defaultdict(lambda: Rating())
+    for winner, loser in matches:
+        rating[winner], rating[loser] = rate_1vs1(rating[winner], rating[loser])
+    return {el: r.mu - 2 * r.sigma for el, r in rating.items()}
 
 random_selection = build_experiment(name='random', selector=random_selector)
 
