@@ -10,8 +10,10 @@ from trueskill import Rating, quality_1vs1, rate_1vs1
 
 def get_ip():
     import socket
-    hostname = socket.gethostname()
-    return hostname
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('google.com', 0))
+    ip = s.getsockname()[0]
+    return ip
 
 DEBUG = True
 IMG_SERVER = 'http://{}:5001'.format(get_ip())
@@ -49,15 +51,25 @@ def random_selector():
     img1, img2 = Image.query.order_by(func.random()).limit(2)
     return img1, img2
 
+def fair_selector(nb_samples=100):
+    def selector_():
+        matches = get_matches_urls()
+        rating = get_rating(matches)
+        imgs = []
+        for i in range(nb_samples):
+            img1, img2 = Image.query.order_by(func.random()).limit(2)
+            imgs.append((img1, img2))
+        print(max(map(lambda (img1, img2): get_fairness(rating, img1.url, img2.url), imgs)))
+        return max(imgs, key=lambda (img1, img2): get_fairness(rating, img1.url, img2.url))
+    return selector_
+
 def build_experiment(name='', addr='', selector=None):
     if addr == '':
         addr = name
     if selector is None:
         selector = random_selector
 
-    @app.route('/' + addr, methods=['GET', 'POST'])
     def page_gen():
-
         if request.method == 'POST':
             winner = request.form['winner']
             loser = request.form['loser']
@@ -74,6 +86,8 @@ def build_experiment(name='', addr='', selector=None):
                                url1=parse(img1.url), url2=parse(img2.url), 
                                id1=img1.id, id2=img2.id,
                                experiment=name)
+    page_gen.__name__ = name
+    page_gen = app.route('/' + addr, methods=['GET', 'POST'])(page_gen)
     return page_gen
 
 def parse(url):
@@ -91,22 +105,38 @@ def matches():
 
 @app.route('/ranks/')
 def ranks():
+    urls, scores = get_urls_and_scores()
+    return render_template('rank.html', rank_url_score=zip(range(1, len(urls) + 1), urls, scores))
+
+def get_urls_and_scores():
     urls = [image.url for image in Image.query.all()]
-    matches = Match.query.all()
-    matches = [(match.left.url, match.right.url) for match in matches]
+    matches = get_matches_urls()
     score = get_scores(matches)
     urls = sorted(score.keys(), key=lambda url: -score[url])
     scores = map(lambda url:score[url], urls)
     urls = map(parse, urls)
-    return render_template('rank.html', rank_url_score=zip(range(1, len(urls) + 1), urls, scores))
+    return urls, scores
+
+def get_matches_urls():
+    matches = Match.query.all()
+    matches = [(match.left.url, match.right.url) for match in matches]
+    return matches
 
 def get_scores(matches):
+    rating = get_rating(matches)
+    return {el: r.mu - 2 * r.sigma for el, r in rating.items()}
+
+def get_rating(matches):
     rating = defaultdict(lambda: Rating())
     for winner, loser in matches:
         rating[winner], rating[loser] = rate_1vs1(rating[winner], rating[loser])
-    return {el: r.mu - 2 * r.sigma for el, r in rating.items()}
+    return rating
+
+def get_fairness(rating, url1, url2):
+    return quality_1vs1(rating[url1], rating[url2])
 
 random_selection = build_experiment(name='random', selector=random_selector)
+fair_selection = build_experiment(name='fair', selector=fair_selector(nb_samples=100))
 
 if __name__ == '__main__':
     import argparse
