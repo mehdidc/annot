@@ -23,9 +23,13 @@ def insert_local(folder='imgs'):
             print("{} not accepted".format(filename))
             continue
         url = '{LOCAL}/' + filename
-        db.session.add(Image(url=url))
-        print("Adding {}...".format(filename))
-    db.session.commit()
+        try:
+            db.session.add(Image(url=url))
+            print("Adding {}...".format(filename))
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            print("Exception : {}, ignoring {}".format(ex, filename))
 
 def accept(filename):
     val = imread(filename).sum()
