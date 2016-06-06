@@ -47,48 +47,56 @@ class Image(db.Model):
     def __repr__(self):
         return '<Image {}>'.format(self.url)
 
-def random_selector():
-    img1, img2 = Image.query.order_by(func.random()).limit(2)
-    return img1, img2
+def random_selector(pattern='%', name='random'):
 
-def fair_selector(nb_samples=100):
+    def selector_():
+        q = Image.query.filter(Image.url.like(pattern))
+        img1, img2 = q.order_by(func.random()).limit(2)
+        return img1, img2
+    selector_.__name__ = name
+    return selector_
+
+def fair_selector(pattern='%', name='fair', nb_samples=100):
     def selector_():
         matches = get_matches_urls()
         rating = get_rating(matches)
         imgs = []
         for i in range(nb_samples):
-            img1, img2 = Image.query.order_by(func.random()).limit(2)
+            q = Image.query.filter(Image.url.like(pattern))
+            img1, img2 = q.order_by(func.random()).limit(2)
             imgs.append((img1, img2))
         print(max(map(lambda (img1, img2): get_fairness(rating, img1.url, img2.url), imgs)))
         return max(imgs, key=lambda (img1, img2): get_fairness(rating, img1.url, img2.url))
+    selector_.__name__ = name
     return selector_
 
-def build_experiment(name='', addr='', selector=None):
-    if addr == '':
-        addr = name
-    if selector is None:
-        selector = random_selector
+def build_experiment(name='', selectors=None):
+    if selectors is None:
+        selectors = [random_selector]
+    pages = []    
+    for select in selectors:
+        addr = select.__name__
+        def page_gen():
+            if request.method == 'POST':
+                winner = request.form['winner']
+                loser = request.form['loser']
+                experiment = request.form['experiment']
+                if winner and loser and experiment:
+                    winner = int(winner)
+                    loser = int(loser)
+                    print('Adding a match...')
+                    db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr))
+                    db.session.commit()
 
-    def page_gen():
-        if request.method == 'POST':
-            winner = request.form['winner']
-            loser = request.form['loser']
-            experiment = request.form['experiment']
-            if winner and loser and experiment:
-                winner = int(winner)
-                loser = int(loser)
-                print('Adding a match...')
-                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr))
-                db.session.commit()
-
-        img1, img2 = selector()
-        return render_template('template.html', 
-                               url1=parse(img1.url), url2=parse(img2.url), 
-                               id1=img1.id, id2=img2.id,
-                               experiment=name)
-    page_gen.__name__ = name
-    page_gen = app.route('/' + addr, methods=['GET', 'POST'])(page_gen)
-    return page_gen
+            img1, img2 = select()
+            return render_template('template.html', 
+                                   url1=parse(img1.url), url2=parse(img2.url), 
+                                   id1=img1.id, id2=img2.id,
+                                   experiment=name)
+        page_gen.__name__ = name + '_' + select.__name__
+        page = app.route('/' + addr, methods=['GET', 'POST'])(page_gen)
+        pages.append(page)
+    return pages
 
 def parse(url):
     return url.format(LOCAL=IMG_SERVER)
@@ -105,20 +113,25 @@ def matches():
 
 @app.route('/ranks/')
 def ranks():
-    urls, scores = get_urls_and_scores()
+    experiment = request.args.get('experiment')
+    if experiment is None:
+        matches = None
+    else:
+        matches = Match.query.filter_by(experiment=experiment)
+    urls, scores = get_urls_and_scores(matches)
     return render_template('rank.html', rank_url_score=zip(range(1, len(urls) + 1), urls, scores))
 
-def get_urls_and_scores():
-    urls = [image.url for image in Image.query.all()]
-    matches = get_matches_urls()
+def get_urls_and_scores(matches=None):
+    matches = get_matches_urls(matches)
     score = get_scores(matches)
     urls = sorted(score.keys(), key=lambda url: -score[url])
     scores = map(lambda url:score[url], urls)
     urls = map(parse, urls)
     return urls, scores
 
-def get_matches_urls():
-    matches = Match.query.all()
+def get_matches_urls(matches=None):
+    if matches is None:
+        matches = Match.query.all()
     matches = [(match.left.url, match.right.url) for match in matches]
     return matches
 
@@ -135,8 +148,12 @@ def get_rating(matches):
 def get_fairness(rating, url1, url2):
     return quality_1vs1(rating[url1], rating[url2])
 
-random_selection = build_experiment(name='random', selector=random_selector)
-fair_selection = build_experiment(name='fair', selector=fair_selector(nb_samples=100))
+#random_selection = build_experiment(name='mnist', selector=random_selector)
+#fair_selection = build_experiment(name='fair', selector=fair_selector(nb_samples=100))
+
+gan = build_experiment(name='gan',
+                        selectors=[random_selector('%samples%', name='gan_random'), 
+                                   fair_selector('%samples%', nb_samples=100, name='gan_fair')])
 
 if __name__ == '__main__':
     import argparse
