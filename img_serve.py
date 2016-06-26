@@ -1,5 +1,5 @@
 #!/bin/python
-
+import re
 import os
 from flask import Flask, Response, request, abort, render_template_string, send_from_directory
 from PIL import  Image
@@ -15,38 +15,19 @@ TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title></title>
-    <meta charset="utf-8" />
     <style>
-body {
-    margin: 0;
-    background-color: #333;
-}
-
-.image {
-    display: block;
-    margin: 2em auto;
-    background-color: #444;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
-}
-
-img {
-    display: block;
-}
+    p{
+        text-align: center;
+    }
+    img{
+    }
     </style>
-    <script src="https://code.jquery.com/jquery-1.10.2.min.js" charset="utf-8"></script>
-    <script src="http://luis-almeida.github.io/unveil/jquery.unveil.min.js" charset="utf-8"></script>
-    <script>
-$(document).ready(function() {
-    $('img').unveil(1000);
-});
-    </script>
 </head>
 <body>
     {% for image in images %}
-        <a class="image" href="{{ image.src }}" style="width: {{ image.width }}px; height: {{ image.height }}px">
-            <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ image.src }}?w={{ image.width }}&amp;h={{ image.height }}" width="{{ image.width }}" height="{{ image.height }}" />
-        </a>
+        <p>
+        <img src='/{{ image.src }}' />
+        </p>
     {% endfor %}
 </body>
 '''
@@ -71,17 +52,20 @@ def image(filename):
 
     return send_from_directory('.', filename)
 
-def get_all_imgs(folder='.'):
-    for root, dirs, files in os.walk(folder):
+def get_all_imgs(folder='.', pattern=''):
+    regexp = re.compile(pattern)
+    for root, dirs, files in os.walk(folder, followlinks=True):
         for filename in [os.path.join(root, name) for name in files]:
             if not filename.endswith('.jpg') and not filename.endswith('.png'):
                 continue
+            if not regexp.search(filename):
+                continue
             yield filename
 
-@app.route('/')
-def index():
+@app.route('/pattern/<pattern>')
+def index(pattern):
     images = []
-    for filename in get_all_imgs('.'):
+    for filename in get_all_imgs('.', pattern=pattern):
         try:
             im = Image.open(filename)
             w, h = im.size
@@ -102,6 +86,7 @@ def index():
     return render_template_string(TEMPLATE, **{
         'images': images
     })
+
 
 if __name__ == '__main__':
     import argparse

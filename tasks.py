@@ -17,8 +17,8 @@ def insert_urls(filename):
     db.session.commit()
 
 @task
-def insert_local(folder='imgs'):
-    for filename in get_all_imgs(folder):
+def insert_local(folder='imgs', pattern=''):
+    for filename in get_all_imgs(folder, pattern=pattern):
         if not accept(filename):
             print("{} not accepted".format(filename))
             continue
