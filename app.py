@@ -70,7 +70,7 @@ def fair_selector(pattern='%', name='fair', nb_samples=100):
     selector_.__name__ = name
     return selector_
 
-def build_experiment(name='', selectors=None):
+def build_experiment(name='', question='Which one do you prefer?', selectors=None):
     if selectors is None:
         selectors = [random_selector]
     pages = []    
@@ -92,6 +92,7 @@ def build_experiment(name='', selectors=None):
             return render_template('template.html', 
                                    url1=parse(img1.url), url2=parse(img2.url), 
                                    id1=img1.id, id2=img2.id,
+                                   question=question,
                                    experiment=name)
         page_gen.__name__ = name + '_' + select.__name__
         page = app.route('/' + addr, methods=['GET', 'POST'])(page_gen)
@@ -148,12 +149,15 @@ def get_rating(matches):
 def get_fairness(rating, url1, url2):
     return quality_1vs1(rating[url1], rating[url2])
 
-#random_selection = build_experiment(name='mnist', selector=random_selector)
-#fair_selection = build_experiment(name='fair', selector=fair_selector(nb_samples=100))
+creative = build_experiment(
+        name='innovative', 
+        question='Which one is more innovative ? ',
+        selectors=[random_selector('%models_mini%', name='innovative')])
 
-gan = build_experiment(name='gan',
-                        selectors=[random_selector('%samples%', name='gan_random'), 
-                                   fair_selector('%samples%', nb_samples=100, name='gan_fair')])
+#fair_selection = build_experiment(name='fair', selector=fair_selector(nb_samples=100))
+#gan = build_experiment(name='gan',
+#                        selectors=[random_selector('%samples%', name='gan_random'), 
+#                                   fair_selector('%samples%', nb_samples=100, name='gan_fair')])
 
 if __name__ == '__main__':
     import argparse
