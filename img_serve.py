@@ -64,8 +64,28 @@ def get_all_imgs(folder='.', pattern=''):
 
 @app.route('/pattern/<pattern>')
 def index(pattern):
+    list_filenames = get_all_imgs('.', pattern=pattern)
+    images = get_images(list_filenames)
+    return render_template_string(TEMPLATE, **{
+        'images': images
+    })
+
+
+@app.route('/bookmark/<filename>')
+def bookmark(filename):
     images = []
-    for filename in get_all_imgs('.', pattern=pattern):
+    for pattern in open(filename).readlines():
+        pattern = pattern[0:-1]
+        list_filenames = get_all_imgs('.', pattern=pattern)
+        images.extend(get_images(list_filenames))
+    return render_template_string(TEMPLATE, **{
+        'images': images
+    })
+
+
+def get_images(filenames):
+    images = []
+    for filename in filenames:
         try:
             im = Image.open(filename)
             w, h = im.size
@@ -83,9 +103,7 @@ def index(pattern):
             })
         except Exception:
             continue
-    return render_template_string(TEMPLATE, **{
-        'images': images
-    })
+    return images
 
 
 if __name__ == '__main__':

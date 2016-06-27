@@ -154,10 +154,10 @@ creative = build_experiment(
         question='Which one is more innovative ? ',
         selectors=[random_selector('%models_mini%', name='innovative')])
 
-#fair_selection = build_experiment(name='fair', selector=fair_selector(nb_samples=100))
-#gan = build_experiment(name='gan',
-#                        selectors=[random_selector('%samples%', name='gan_random'), 
-#                                   fair_selector('%samples%', nb_samples=100, name='gan_fair')])
+gan = build_experiment(
+        name='gan', 
+        question='Which one is more good looking ?',
+        selectors=[random_selector('%gan/%', name='gan')])
 
 if __name__ == '__main__':
     import argparse
@@ -176,4 +176,4 @@ if __name__ == '__main__':
                         default=IMG_SERVER)
     args = parser.parse_args()
     IMG_SERVER = args.imgserver
-    app.run(host=args.host, port=args.port, debug=DEBUG)
+    app.run(host=args.host, port=args.port, debug=DEBUG, threaded=True)
