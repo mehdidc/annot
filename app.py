@@ -156,7 +156,7 @@ creative = build_experiment(
 
 gan = build_experiment(
         name='gan', 
-        question='Which one is more good looking ?',
+        question='Which one is more good looking/realistic ?',
         selectors=[random_selector('%gan/%', name='gan')])
 
 if __name__ == '__main__':

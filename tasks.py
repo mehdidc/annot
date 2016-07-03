@@ -2,7 +2,7 @@ import os
 
 from skimage.io import imread
 from invoke import task
-from app import db, Image
+from app import db, Image, Match
 from img_serve import get_all_imgs
 
 @task
@@ -35,6 +35,12 @@ def insert_local(folder='imgs', pattern=''):
 def remove(pattern=''):
     q = Image.query.filter(Image.url.like(pattern))
     print('nb deleted : {}'.format(q.delete(synchronize_session=False)))
+    db.session.commit()
+
+@task
+def remove_matches(experiment=''):
+    q = Match.query.filter(Match.experiment==experiment)
+    q.delete(synchronize_session=False)
     db.session.commit()
 
 def accept(filename):
