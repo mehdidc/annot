@@ -70,7 +70,7 @@ def fair_selector(pattern='%', name='fair', nb_samples=100):
     selector_.__name__ = name
     return selector_
 
-def build_experiment(name='', question='Which one do you prefer?', selectors=None):
+def build_experiment(name='', question='Which one do you prefer?', selectors=None, w=200, h=200):
     if selectors is None:
         selectors = [random_selector]
     pages = []    
@@ -93,6 +93,8 @@ def build_experiment(name='', question='Which one do you prefer?', selectors=Non
                                    url1=parse(img1.url), url2=parse(img2.url), 
                                    id1=img1.id, id2=img2.id,
                                    question=question,
+                                   w=w,
+                                   h=h,
                                    experiment=name)
         page_gen.__name__ = name + '_' + select.__name__
         page = app.route('/' + addr, methods=['GET', 'POST'])(page_gen)
@@ -157,7 +159,9 @@ creative = build_experiment(
 gan = build_experiment(
         name='gan', 
         question='Which one is more good looking/realistic ?',
-        selectors=[random_selector('%gan/%', name='gan')])
+        selectors=[random_selector('%gan/%', name='gan')],
+        w=800,
+        h=800)
 
 if __name__ == '__main__':
     import argparse

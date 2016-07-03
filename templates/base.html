@@ -13,7 +13,7 @@
     td { text-align:center; border: 1px solid black}
     td.image { background-color:#b0c4de; }
     td.image:hover { background-color:#4682b4; }
-    .img-thumbnail {width: 200px; height: 200px;}
+    .img-thumbnail {width: {{ w | default('200') }}px; height: {{ h | default('200') }}px ;}
 
   </style>
   

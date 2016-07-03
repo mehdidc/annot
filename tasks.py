@@ -4,6 +4,8 @@ from skimage.io import imread
 from invoke import task
 from app import db, Image, Match
 from img_serve import get_all_imgs
+from sqlalchemy import distinct
+
 
 @task
 def create_db():
@@ -42,6 +44,12 @@ def remove_matches(experiment=''):
     q = Match.query.filter(Match.experiment==experiment)
     q.delete(synchronize_session=False)
     db.session.commit()
+
+@task
+def experiments():
+    q = db.session.query(distinct(Match.experiment))
+    q = list(q)
+    print(q)
 
 def accept(filename):
     val = imread(filename).sum()
