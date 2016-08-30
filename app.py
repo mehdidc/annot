@@ -379,10 +379,11 @@ def classifier():
     classes = experiment_classes[exp]
     if request.method == 'POST':
         if 'class' in request.form:
-            label = request.form['class']
+            labels = request.form.getlist('class')
             value = 1
             img_id = int(request.form['img_id'])
-            db.session.add(Classification(img_id=img_id, user_id=user.id, label=label, value=value))
+            for label in labels:
+                db.session.add(Classification(img_id=img_id, user_id=user.id, label=label, value=value))
             db.session.commit()
 
     q_existing = db.session.query(Classification, Image).filter(Classification.user_id==user.id).filter(Image.id==Classification.img_id)
@@ -416,15 +417,16 @@ def export_data():
     q = q.filter(Image.id==Classification.img_id)
     q = q.filter(User.id==Classification.user_id)
     rows = [
-         OrderedDict([ 
-                       ('label', classif.label),
-                       ('hypers', get_hypers(get_id_from_url(img.url))),
-                       ('user', user.name),
-                       ])
+            {
+                'id': get_id_from_url(img.url),
+                'label': classif.label,
+                'hypers': get_hypers(get_id_from_url(img.url)),
+                'user': user.name
+            }
         for classif, img, user in q
     ]
     df = pd.DataFrame(rows)
-    csv_content = df.to_csv(index=False, columns=['hypers', 'user', 'label'])
+    csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'user', 'label'])
     return Response(csv_content, mimetype='text/csv')
 
 def get_id_from_url(url):
