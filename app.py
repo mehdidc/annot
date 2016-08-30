@@ -1,12 +1,22 @@
 import os
 from collections import defaultdict
-from flask import Flask, request
+from flask import Flask, request, redirect, render_template, url_for
 from flask_sqlalchemy import SQLAlchemy
-from flask import render_template
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, relationship
 from  sqlalchemy.sql.expression import func, select
+from sqlalchemy.orm import aliased
+
+from flask.ext.sqlalchemy_cache import CachingQuery
+from flask.ext.sqlalchemy_cache import FromCache
+from flask.ext.sqlalchemy import SQLAlchemy, Model
+
+from flask.ext.cache import Cache
+
 from trueskill import Rating, quality_1vs1, rate_1vs1
+from itertools import product
+import random
+import numpy as np
 
 def get_ip():
     import socket
@@ -21,8 +31,12 @@ IMG_SERVER = 'http://{}:5001'.format(get_ip())
 app = Flask(__name__)
 db_filename = 'data.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///{}'.format(db_filename)
-db = SQLAlchemy(app)
+#app.config['CACHE_TYPE'] = 'memcached'
 
+Model.query_class = CachingQuery
+db = SQLAlchemy(app, session_options={'query_cls': CachingQuery})
+
+cache = Cache(app)
 
 class Match(db.Model):
     __tablename__ = 'Match'
@@ -35,8 +49,6 @@ class Match(db.Model):
 
     left = relationship('Image', foreign_keys='Match.left_id')
     right = relationship('Image', foreign_keys='Match.right_id')
-
-
 
 class Image(db.Model):
     __tablename__ = 'Image'
@@ -56,50 +68,87 @@ def random_selector(pattern='%', name='random'):
     selector_.__name__ = name
     return selector_
 
-def fair_selector(pattern='%', name='fair', nb_samples=100):
+def fair_selector(pattern='%', name='fair', thresh=0.5, percentile=90):
     def selector_():
-        matches = get_matches_urls()
-        rating = get_rating(matches)
-        imgs = []
-        for i in range(nb_samples):
-            q = Image.query.filter(Image.url.like(pattern))
-            img1, img2 = q.order_by(func.random()).limit(2)
-            imgs.append((img1, img2))
-        print(max(map(lambda (img1, img2): get_fairness(rating, img1.url, img2.url), imgs)))
-        return max(imgs, key=lambda (img1, img2): get_fairness(rating, img1.url, img2.url))
+        import time
+        image_alias = aliased(Image)
+        matches = Match.query
+        matches = matches.options(FromCache(cache))
+        matches = matches.join(Match.left).join(image_alias, Match.right)
+        matches = matches.filter(Image.url.like(pattern))
+        matches = matches.filter(image_alias.url.like(pattern))
+
+        t = time.time()
+        images = [(match.left, match.right) for match in matches]
+        print(time.time() - t)
+
+        t = time.time()
+        matches_urls = [(left.url, right.url) for left, right in images]
+        print(time.time() - t)
+
+    
+        t = time.time()
+        score = get_scores(images)
+        print(time.time() - t)
+
+        percentile_val = np.percentile(score.values(), percentile)
+        urls = score.keys()
+        urls = filter(lambda url:score[url] > percentile_val, urls)
+        t = time.time()
+        rating = get_rating(images)
+        print(time.time() - t)
+
+        t = time.time()
+        match = list(product(urls, urls))
+        random.shuffle(match)
+        for left, right in match:
+            f = get_fairness(rating, left, right)
+            if f >= thresh:
+                break
+        print(time.time() - t)
+        return left, right
     selector_.__name__ = name
     return selector_
 
 def build_experiment(name='', question='Which one do you prefer?', selectors=None, w=200, h=200):
     if selectors is None:
         selectors = [random_selector]
-    pages = []    
-    for select in selectors:
-        addr = select.__name__
-        def page_gen():
-            if request.method == 'POST':
-                winner = request.form['winner']
-                loser = request.form['loser']
-                experiment = request.form['experiment']
-                if winner and loser and experiment:
-                    winner = int(winner)
-                    loser = int(loser)
-                    print('Adding a match...')
-                    db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr))
-                    db.session.commit()
+    def page_gen(selector):
+        if request.method == 'POST':
+            winner = request.form['winner']
+            loser = request.form['loser']
+            experiment = request.form['experiment']
+            if winner and loser and experiment:
+                winner = int(winner)
+                loser = int(loser)
+                print('Adding a match...')
+                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr))
+                db.session.commit()
+        selector = selector.replace('/', '')
+        print(selector)
+        for select in selectors:
+            if select.__name__ == selector:
+                img1, img2 = select()
+                break
+        return render_template('template.html', 
+                               url1=parse(img1.url), url2=parse(img2.url), 
+                               id1=img1.id, id2=img2.id,
+                               question=question,
+                               w=w,
+                               h=h,
+                               experiment=name)
+    
+    sel_name = selectors[0].__name__
+    def page_gen_default():
+        return page_gen(sel_name)
+    page_gen_default.__name__ = name + '_default'
 
-            img1, img2 = select()
-            return render_template('template.html', 
-                                   url1=parse(img1.url), url2=parse(img2.url), 
-                                   id1=img1.id, id2=img2.id,
-                                   question=question,
-                                   w=w,
-                                   h=h,
-                                   experiment=name)
-        page_gen.__name__ = name + '_' + select.__name__
-        page = app.route('/' + addr, methods=['GET', 'POST'])(page_gen)
-        pages.append(page)
-    return pages
+    page_gen.__name__ = name
+    addr = '/' + name + '/<string:selector>/'
+    page_gen = app.route(addr, methods=['GET', 'POST'])(page_gen)
+    addr = '/'+ name + '/'
+    page_gen_default = app.route(addr, methods=['GET', 'POST'])(page_gen_default)
+    return page_gen
 
 def parse(url):
     return url.format(LOCAL=IMG_SERVER)
@@ -132,6 +181,13 @@ def get_urls_and_scores(matches=None):
     urls = map(parse, urls)
     return urls, scores
 
+
+def get_matches_images(matches=None):
+    if matches is None:
+        matches = Match.query.all()
+    matches = [(match.left, match.right) for match in matches]
+    return matches
+
 def get_matches_urls(matches=None):
     if matches is None:
         matches = Match.query.all()
@@ -151,17 +207,44 @@ def get_rating(matches):
 def get_fairness(rating, url1, url2):
     return quality_1vs1(rating[url1], rating[url2])
 
-creative = build_experiment(
+innovative = build_experiment(
         name='innovative', 
         question='Which one is more innovative ? ',
-        selectors=[random_selector('%models_mini%', name='innovative')])
+        selectors=[random_selector('%models_mini%', name='random'),
+                   fair_selector('%models_mini%', name='fair', thresh=0.5, percentile=90)])
+
+existing = build_experiment(
+        name='existing', 
+        question='Which one looks more like existing digits?',
+        selectors=[random_selector('%models_mini%', name='random'),
+                   fair_selector('%models_mini%', name='fair', thresh=0.5, percentile=90)])
+
+fixating = build_experiment(
+        name='fixating', 
+        question='Which one is fixating more?',
+        selectors=[random_selector('%models_mini%', name='random'),
+                   fair_selector('%models_mini%', name='fair', thresh=0.5, percentile=90)])
+
+noisy = build_experiment(
+        name='noisier', 
+        question='Which one is noisier ?',
+        selectors=[random_selector('%models_mini%', name='random'),
+                   fair_selector('%models_mini%', name='fair', thresh=0.5, percentile=90)])
+
 
 gan = build_experiment(
         name='gan', 
         question='Which one is more good looking/realistic ?',
-        selectors=[random_selector('%gan/%', name='gan')],
+        selectors=[random_selector('%gan/%', name='random'),
+                   fair_selector('%gan%', name='fair', thresh=0.5, percentile=90)],
         w=800,
         h=800)
+
+@app.route('/')
+def index():
+    page_name = 'innovative'
+    selector = 'random'
+    return redirect(url_for(page_name, selector=selector)) 
 
 if __name__ == '__main__':
     import argparse

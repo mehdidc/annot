@@ -116,4 +116,4 @@ if __name__ == '__main__':
                         type=int,
                         default=5000)
     args = parser.parse_args()
-    app.run(host=args.host, port=args.port, debug=DEBUG)
+    app.run(host=args.host, port=args.port, threaded=True, debug=DEBUG)
