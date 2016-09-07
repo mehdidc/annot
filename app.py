@@ -24,6 +24,7 @@ import random
 import numpy as np
 
 import hashlib
+import json
 
 def get_ip():
     import socket
@@ -364,7 +365,8 @@ experiment_classes = {
         ('innovative', 'It is innovative'),
         ('existing', 'It looks like existing digits'),
         ('fixating', 'It is fixating '),
-        ('noisy', 'It is noisy')
+        ('noisy', 'It is noisy'),
+        ('aesthetic', 'It is aesthetic')
     ]
 }
 
@@ -412,6 +414,11 @@ def export_data():
        s_ref = c['model_summary']
        c_ref = light_db.get_by_id(s_ref)['content']
        return c_ref
+    def accept_model(s):
+       c = light_db.get_by_id(s)['content']
+       s_ref = c['model_summary']
+       c_ref = light_db.get_by_id(s_ref)['content']
+       return c_ref['dataset'] == 'digits'
 
     q = db.session.query(Classification, Image, User)
     q = q.filter(Image.id==Classification.img_id)
@@ -420,10 +427,11 @@ def export_data():
             {
                 'id': get_id_from_url(img.url),
                 'label': classif.label,
-                'hypers': get_hypers(get_id_from_url(img.url)),
+                'hypers': json.dumps(get_hypers(get_id_from_url(img.url))),
                 'user': user.name
             }
         for classif, img, user in q
+        if accept_model(get_id_from_url(img.url))
     ]
     df = pd.DataFrame(rows)
     csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'user', 'label'])

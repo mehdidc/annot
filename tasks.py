@@ -9,7 +9,7 @@ from sqlalchemy import distinct
 
 @task
 def create_db(ctx):
-    #Classification.__table__.drop(db.engine)
+    Classification.__table__.drop(db.engine)
     db.create_all()
     User.new(name='admin', pwd='admin')
     User.new(name='kegl', pwd='kegl')
