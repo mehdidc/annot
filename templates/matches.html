@@ -4,17 +4,19 @@
 
    <table style='border:1px solid black;border-collapse: collapse'>
    <tr>
+    <td>Experiment</td>
     <td>Winner</td>
     <td>Loser</td>
     <td>Datetime</td>
-    <td>ip</td>
+    <td>username</td>
    </tr>
-    {% for match in matches %}
+    {% for match, user in matches %}
       <tr>
-          <td><a href='{{ match.left.url | parse_url }}'>{{ match.left.url | parse_url | truncate(40) }}</a> </td>
+          <td>{{ match.experiment }}</td>
+        <td><a href='{{ match.left.url | parse_url }}'>{{ match.left.url | parse_url | truncate(40) }}</a> </td>
         <td><a href='{{ match.right.url | parse_url }}'>{{ match.right.url | parse_url | truncate(40) }}</a></td>
         <td>{{ match.datetime }}</td>
-        <td>{{ match.ip }}</td>
+        <td>{{ user.name }}</td>
       </tr>
     {% endfor %}
    </table>

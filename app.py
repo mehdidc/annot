@@ -220,10 +220,11 @@ def build_experiment(name='', question='Which one do you prefer?', selectors=Non
                     'left': winner,
                     'right': loser,
                     'exp': experiment,
-                    'sel': selector
+                    'sel': selector,
+                    'user': current_user.name
                 }
-                print('Adding a match between {left} (winner) and {right} (loser) in experiment {exp} where the selector is : {sel}'.format(**args))
-                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr))
+                print('Adding a match between "{left}" (winner) and "{right}" (loser) in experiment "{exp}" where the selector is ""{sel}"" done by user ""{user}""'.format(**args))
+                db.session.add(Match(left_id=winner, right_id=loser, experiment=experiment, ip=request.remote_addr, user_id=current_user.id))
                 db.session.commit()
         selector = selector.replace('/', '')
         for select in selectors:
@@ -258,11 +259,12 @@ app.jinja_env.filters['parse_url'] = parse
 @app.route('/matches/')
 def matches():
     experiment = request.args.get('experiment')
-    if experiment is not None:
-        matches = Match.query.filter_by(experiment=experiment)
+    q = db.session.query(Match, User).filter(Match.user_id==User.id)
+    if experiment:
+        q = Match.query.filter_by(Match.experiment==experiment)
     else:
-        matches = Match.query.all()
-    return render_template('matches.html', matches=matches)
+        q = q.all()
+    return render_template('matches.html', matches=q)
 
 @app.route('/ranks/')
 def ranks():
