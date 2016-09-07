@@ -9,11 +9,15 @@ from sqlalchemy import distinct
 
 @task
 def create_db(ctx):
-    Classification.__table__.drop(db.engine)
+    #Classification.__table__.drop(db.engine)
     db.create_all()
+
+@task
+def create_users(ctx):
     User.new(name='admin', pwd='admin')
     User.new(name='kegl', pwd='kegl')
     User.new(name='mehdi', pwd='mehdi')
+    User.new(name='anonymous', pwd='anonymous')
 
 
 @task

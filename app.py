@@ -71,6 +71,7 @@ class Match(db.Model):
     datetime = Column(DateTime, default=func.now())
     experiment =  db.Column(db.String(50))
     ip = db.Column(db.String(50))
+    user_id = db.Column(db.Integer, ForeignKey('User.id'))
 
     left = relationship('Image', foreign_keys='Match.left_id')
     right = relationship('Image', foreign_keys='Match.right_id')
