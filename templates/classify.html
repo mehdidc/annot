@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "pagination.html" as paginate %}
+
+{% block body %}
+
+   <table style='border:1px solid black;border-collapse: collapse'>
+   <tr>
+    <td>Model</td>
+    <td>Classes</td>
+   </tr>
+    {% for url in urls %}
+      <tr>
+        <td><a href="{{ url }}"><img class='img-thumbnail' src="{{ url }}"/></a></td>
+
+        <td>
+        <ul style="list-style-type:none">
+                {% for class_name, class_question in classes %}
+                <li>
+                <input type="radio" name="class" value="{{ class_name }}" />{{ class_question }}
+                </li>
+                {% endfor %}
+        </ul>
+        </td>
+      </tr>
+    {% endfor %}
+   </table>
+
+{{ paginate.render_pagination(pagination) }}
+{% endblock %}
