@@ -66,8 +66,8 @@ def load_user(id):
 class Match(db.Model):
     __tablename__ = 'Match'
     id = db.Column(db.Integer, primary_key=True)
-    left_id = db.Column(db.Integer, ForeignKey('Image.id'))
-    right_id = db.Column(db.Integer, ForeignKey('Image.id'))
+    left_id = db.Column(db.Integer, ForeignKey('Image.id')) # Winner
+    right_id = db.Column(db.Integer, ForeignKey('Image.id')) # Loser
     datetime = Column(DateTime, default=func.now())
     experiment =  db.Column(db.String(50))
     ip = db.Column(db.String(50))
@@ -405,12 +405,15 @@ def classifier():
     img.url = parse(img.url)
     return render_template('classify_one.html', img=img, classes=classes, w=250, h=250, nb=nb)
 
+
 @app.route('/export_data', methods=['GET', 'POST'])
 def export_data():
     from lightjob.cli import load_db
     import pandas as pd
     from collections import OrderedDict
     light_db = load_db(folder='../feature_generation/.lightjob')
+
+    type_ = request.args.get('type', 'classification')
 
     def get_hypers(s):
        c = light_db.get_by_id(s)['content']
@@ -422,22 +425,74 @@ def export_data():
        s_ref = c['model_summary']
        c_ref = light_db.get_by_id(s_ref)['content']
        return c_ref['dataset'] == 'digits'
+        
+    if type_ == 'classification':
+        q = db.session.query(Classification, Image, User)
+        q = q.filter(Image.id==Classification.img_id)
+        q = q.filter(User.id==Classification.user_id)
+        rows = [
+                {
+                    'id': get_id_from_url(img.url),
+                    'label': classif.label,
+                    'hypers': json.dumps(get_hypers(get_id_from_url(img.url))),
+                    'user': user.name
+                }
+            for classif, img, user in q
+            if accept_model(get_id_from_url(img.url))
+        ]
+        df = pd.DataFrame(rows)
+        csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'user', 'label'])
+    elif type_ == 'match':
+        image_alias = aliased(Image)
+        q = db.session.query(Match, User)
+        q = q.filter(Match.user_id == User.id)
+        q = q.join(Match.left).join(image_alias, Match.right)
+        exp = [
+            'innovative',
+            'existing',
+            'noisier',
+            'fixating'
+        ]
+        exp = map(lambda e:Match.experiment==e, exp)
+        q = q.filter(or_(*exp))
+        rows = [
+                {
+                    'id_winner': get_id_from_url(match.left.url),
+                    'id_loser': get_id_from_url(match.right.url),
+                    'experiment': match.experiment,
+                    'hypers_winner': json.dumps(get_hypers(get_id_from_url(match.left.url))),
+                    'hypers_loser': json.dumps(get_hypers(get_id_from_url(match.right.url))),
+                    'user': user.name
+                }
+            for match, user in q
+            if accept_model(get_id_from_url(match.left.url)) and accept_model(get_id_from_url(match.right.url))
+        ]
+        df = pd.DataFrame(rows)
+        csv_content = df.to_csv(index=False, columns=['id_winner', 'id_loser', 'experiment', 'hypers_winner', 'hypers_loser', 'user'])
 
-    q = db.session.query(Classification, Image, User)
-    q = q.filter(Image.id==Classification.img_id)
-    q = q.filter(User.id==Classification.user_id)
-    rows = [
-            {
-                'id': get_id_from_url(img.url),
-                'label': classif.label,
-                'hypers': json.dumps(get_hypers(get_id_from_url(img.url))),
-                'user': user.name
-            }
-        for classif, img, user in q
-        if accept_model(get_id_from_url(img.url))
-    ]
-    df = pd.DataFrame(rows)
-    csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'user', 'label'])
+    elif type_ == 'match_scores':
+        exp = [
+            'innovative',
+            'existing',
+            'noisier',
+            'fixating'
+        ]
+        total_rows = []
+        for e in exp:
+            matches = Match.query.filter(Match.experiment==e)
+            urls, scores = get_urls_and_scores(matches)
+            rows = [
+                {
+                    'id': get_id_from_url(url),
+                    'hypers': json.dumps(get_hypers(get_id_from_url(url))),
+                    'score': score,
+                    'experiment': e
+                }
+                for url, score in zip(urls, scores)
+            ]
+            total_rows += rows
+        df = pd.DataFrame(total_rows)
+        csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'score', 'experiment'])
     return Response(csv_content, mimetype='text/csv')
 
 def get_id_from_url(url):
