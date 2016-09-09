@@ -335,13 +335,23 @@ noisier = build_experiment(
                    fair_selector('%models_mini%', name='fair', thresh=0.5, percentile=90)])
 
 
-gan = build_experiment(
-        name='gan', 
+gan_mnist = build_experiment(
+        name='gan_mnist', 
         question='Which one is more good looking/realistic ?',
-        selectors=[random_selector('%gan/%', name='random'),
-                   fair_selector('%gan%', name='fair', thresh=0.5, percentile=90)],
+        selectors=[random_selector('%gan/mnist%', name='random'),
+                   fair_selector('%gan/mnist%', name='fair', thresh=0.5, percentile=90)],
         w=800,
         h=800)
+
+gan_fonts = build_experiment(
+        name='gan_fonts', 
+        question='Which one is more good looking/realistic ?',
+        selectors=[random_selector('%gan/fonts%', name='random'),
+                   fair_selector('%gan/fonts%', name='fair', thresh=0.5, percentile=90)],
+        w=800,
+        h=800)
+
+
 
 @app.route('/<selector>', methods=['GET', 'POST'])
 def index_sel(selector):
