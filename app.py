@@ -204,7 +204,7 @@ def fair_selector(pattern='%', name='fair', thresh=0.5, percentile=90):
     selector_.__name__ = name
     return selector_
 
-def build_experiment(name='', question='Which one do you prefer?', selectors=None, w=200, h=200):
+def build_experiment(name='', question='Which one do you prefer?', selectors=None, **kw):
     if selectors is None:
         selectors = [random_selector]
     
@@ -235,9 +235,8 @@ def build_experiment(name='', question='Which one do you prefer?', selectors=Non
                                url1=parse(img1.url), url2=parse(img2.url), 
                                id1=img1.id, id2=img2.id,
                                question=question,
-                               w=w,
-                               h=h,
-                               experiment=name)
+                               experiment=name,
+                               **kw)
     
     sel_name = selectors[0].__name__
     def page_gen_default():
@@ -340,8 +339,9 @@ gan_mnist = build_experiment(
         question='Which one is more good looking/realistic ?',
         selectors=[random_selector('%gan/mnist%', name='random'),
                    fair_selector('%gan/mnist%', name='fair', thresh=0.5, percentile=90)],
-        w=800,
-        h=800)
+        w=500,
+        h=500,
+        page_width='900px')
 
 gan_fonts = build_experiment(
         name='gan_fonts', 
@@ -349,7 +349,8 @@ gan_fonts = build_experiment(
         selectors=[random_selector('%gan/fonts%', name='random'),
                    fair_selector('%gan/fonts%', name='fair', thresh=0.5, percentile=90)],
         w=800,
-        h=800)
+        h=800,
+        page_width='900px')
 
 
 
@@ -368,19 +369,30 @@ def index_sel(selector):
 def index():
     return index_sel('random')
 
-data_pattern = {
-    'creativity': '%models_mini%',
-    'gan': '%gan%'
-}
-
 experiment_classes = {
-    'creativity': [
-        ('innovative', 'It is innovative'),
-        ('existing', 'It looks like existing digits'),
-        ('fixating', 'It is fixating '),
-        ('noisy', 'It is noisy'),
-        ('aesthetic', 'It is aesthetic')
-    ]
+    'creativity': {
+        'labels':[
+            ('innovative', 'It is innovative'),
+            ('existing', 'It looks like existing digits'),
+            ('fixating', 'It is fixating '),
+            ('noisy', 'It is noisy'),
+            ('aesthetic', 'It is aesthetic')
+        ],
+        'pattern': '%models_mini%'
+    },
+    'gan': {
+        'labels':[
+            ('excellent', 'It is excellent'),
+            ('good', 'It is good'),
+            ('okay', 'It is okay'),
+            ('bad', 'It is bad'),
+            ('very_bad', 'It is really bad')
+        ],
+        'pattern': '%gan%',
+        'w': 600,
+        'h': 600,
+        'page_width': '900px'
+    }
 }
 
 
@@ -388,10 +400,10 @@ experiment_classes = {
 @login_required
 def classifier():
     user = current_user
-    data = request.args.get('data', 'creativity')
     exp = request.args.get('experiment', 'creativity')
-    pattern = data_pattern[data]
-    classes = experiment_classes[exp]
+    eclass = experiment_classes[exp]
+    pattern = experiment_classes[exp]['pattern']
+    classes = experiment_classes[exp]['labels']
     if request.method == 'POST':
         if 'class' in request.form:
             labels = request.form.getlist('class')
@@ -405,7 +417,6 @@ def classifier():
     q_existing = q_existing.subquery()
     q_existing = aliased(Image, q_existing)
     q_existing = Image.query.join(q_existing)
-    
     q_all = Image.query.filter(Image.url.like(pattern))
     q = q_all.except_(q_existing)
     q = q.order_by(func.random())
@@ -413,7 +424,7 @@ def classifier():
     q = q.limit(1)
     img = q.one()
     img.url = parse(img.url)
-    return render_template('classify_one.html', img=img, classes=classes, w=250, h=250, nb=nb)
+    return render_template('classify_one.html', img=img, classes=classes, w=eclass.get('w', 250), h=eclass.get('h', 250), page_width=eclass.get('page_width'), nb=nb)
 
 
 @app.route('/export_data', methods=['GET', 'POST'])
@@ -421,25 +432,40 @@ def export_data():
     from lightjob.cli import load_db
     import pandas as pd
     from collections import OrderedDict
-    light_db = load_db(folder='../feature_generation/.lightjob')
+
+
+    exp_class = request.args.get('class', 'creativity')
+    if exp_class == 'creativity':
+        light_db = load_db(folder='../feature_generation/.lightjob')
+    elif exp_class == 'gan':
+        light_db = load_db(folder='../lasagne-dcgan/.lightjob')
 
     type_ = request.args.get('type', 'classification')
 
     def get_hypers(s):
        c = light_db.get_by_id(s)['content']
-       s_ref = c['model_summary']
-       c_ref = light_db.get_by_id(s_ref)['content']
-       return c_ref
+       if exp_class == 'creativity':
+           s_ref = c['model_summary']
+           c_ref = light_db.get_by_id(s_ref)['content']
+           return c_ref
+       else:
+           return c
     def accept_model(s):
-       c = light_db.get_by_id(s)['content']
-       s_ref = c['model_summary']
-       c_ref = light_db.get_by_id(s_ref)['content']
-       return c_ref['dataset'] == 'digits'
+        if exp_class == 'creativity':
+            c = light_db.get_by_id(s)['content']
+            s_ref = c['model_summary']
+            c_ref = light_db.get_by_id(s_ref)['content']
+            return c_ref['dataset'] == 'digits'
+        return True
         
     if type_ == 'classification':
         q = db.session.query(Classification, Image, User)
         q = q.filter(Image.id==Classification.img_id)
         q = q.filter(User.id==Classification.user_id)
+        exp = [name for name, question in experiment_classes[exp_class]['labels']]
+        exp = map(lambda e:Classification.label==e, exp)
+        q = q.filter(or_(*exp))
+ 
         rows = [
                 {
                     'id': get_id_from_url(img.url),
@@ -448,7 +474,7 @@ def export_data():
                     'user': user.name
                 }
             for classif, img, user in q
-            if accept_model(get_id_from_url(img.url))
+            #if accept_model(get_id_from_url(img.url))
         ]
         df = pd.DataFrame(rows)
         csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'user', 'label'])
@@ -457,12 +483,7 @@ def export_data():
         q = db.session.query(Match, User)
         q = q.filter(Match.user_id == User.id)
         q = q.join(Match.left).join(image_alias, Match.right)
-        exp = [
-            'innovative',
-            'existing',
-            'noisier',
-            'fixating'
-        ]
+        exp = [name for name, question in experiment_classes[exp_class]['labels']]
         exp = map(lambda e:Match.experiment==e, exp)
         q = q.filter(or_(*exp))
         rows = [
@@ -481,12 +502,8 @@ def export_data():
         csv_content = df.to_csv(index=False, columns=['id_winner', 'id_loser', 'experiment', 'hypers_winner', 'hypers_loser', 'user'])
 
     elif type_ == 'match_scores':
-        exp = [
-            'innovative',
-            'existing',
-            'noisier',
-            'fixating'
-        ]
+        exp_class = request.args.get('class', 'creativity')
+        exp = [name for name, question in experiment_classes[exp_class]['labels']]
         total_rows = []
         for e in exp:
             matches = Match.query.filter(Match.experiment==e)
