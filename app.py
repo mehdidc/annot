@@ -378,7 +378,8 @@ experiment_classes = {
             ('noisy', 'It is noisy'),
             ('aesthetic', 'It is aesthetic')
         ],
-        'pattern': '%models_mini%'
+        'pattern': '%models_mini%',
+        'page_width': '300px'
     },
     'gan': {
         'labels':[
@@ -421,6 +422,8 @@ def classifier():
     q = q_all.except_(q_existing)
     q = q.order_by(func.random())
     nb = q.count()
+    if nb == 0:
+        return render_template('done.html')
     q = q.limit(1)
     img = q.one()
     img.url = parse(img.url)
