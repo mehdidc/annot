@@ -474,13 +474,14 @@ def export_data():
                     'id': get_id_from_url(img.url),
                     'label': classif.label,
                     'hypers': json.dumps(get_hypers(get_id_from_url(img.url))),
-                    'user': user.name
+                    'user': user.name,
+                    'url': img.url
                 }
             for classif, img, user in q
             #if accept_model(get_id_from_url(img.url))
         ]
         df = pd.DataFrame(rows)
-        csv_content = df.to_csv(index=False, columns=['id', 'hypers', 'user', 'label'])
+        csv_content = df.to_csv(index=False, columns=['id', 'url', 'hypers', 'user', 'label'])
     elif type_ == 'match':
         image_alias = aliased(Image)
         q = db.session.query(Match, User)
