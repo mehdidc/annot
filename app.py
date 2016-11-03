@@ -353,6 +353,15 @@ gan_fonts = build_experiment(
         page_width='900px')
 
 
+obox = build_experiment(
+        name='obox', 
+        question='Which one looks more like letters ?',
+        selectors=[random_selector('%obox%', name='random'),
+                   fair_selector('%obox%', name='fair', thresh=0.5, percentile=90)],
+        w=500,
+        h=500,
+        page_width='900px')
+
 
 @app.route('/<selector>', methods=['GET', 'POST'])
 def index_sel(selector):
@@ -393,7 +402,21 @@ experiment_classes = {
         'w': 600,
         'h': 600,
         'page_width': '900px'
-    }
+    },
+    'obox': {
+        'labels':[
+            ('good_letters', 'Good Letters'),
+            ('acceptable_letters', 'Acceptable letters'),
+            ('bad_letters', 'Bad letters'),
+            ('digits', 'Digits'),
+            ('bad', 'Bad samples'),
+        ],
+        'pattern': '%obox%',
+        'w': 600,
+        'h': 600,
+        'page_width': '900px'
+    },
+
 }
 
 

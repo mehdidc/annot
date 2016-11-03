@@ -14,11 +14,12 @@ def create_db(ctx):
 
 @task
 def create_users(ctx):
-    User.new(name='admin', pwd='admin')
-    User.new(name='kegl', pwd='kegl')
-    User.new(name='mehdi', pwd='mehdi')
-    User.new(name='anonymous', pwd='anonymous')
-
+    #User.new(name='admin', pwd='admin')
+    #User.new(name='kegl', pwd='kegl')
+    #User.new(name='mehdi', pwd='mehdi')
+    #User.new(name='anonymous', pwd='anonymous')
+    #User.new(name='akin', pwd='akin')
+    User.new(name='balazs', pwd='balazs')
 
 @task
 def insert_urls(ctx, filename):
