@@ -3,7 +3,7 @@ import re
 import os
 from flask import Flask, Response, request, abort, render_template_string, send_from_directory
 from PIL import  Image
-import StringIO
+from io import StringIO
 
 app = Flask(__name__)
 

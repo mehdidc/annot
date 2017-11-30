@@ -34,7 +34,7 @@ def get_ip():
     return ip
 
 DEBUG = True
-IMG_SERVER = 'http://{}:5001'.format(get_ip())
+IMG_SERVER = 'http://{}:20006'.format(get_ip())
 
 app = Flask(__name__)
 
@@ -109,7 +109,7 @@ class User(db.Model, UserMixin):
         return False
  
     def get_id(self):
-        return unicode(self.id)
+        return str(self.id)
  
     def __repr__(self):
         return '<User %r>' % (self.username)
@@ -135,6 +135,7 @@ def logout():
 
 def md5(s):
     m = hashlib.md5()
+    s = s.encode()
     m.update(s)
     return m.hexdigest()
 
@@ -389,6 +390,16 @@ experiment_classes = {
         ],
         'pattern': '%models_mini%',
         'page_width': '300px'
+    },
+    'thesis': {
+        'labels':[
+            ('innovative', 'It is innovative'),
+            ('existing', 'It looks like existing digits'),
+            ('noisy', 'It is noisy'),
+        ],
+        'pattern': '%out_of_class%',
+        'page_width': '300px'
+
     },
     'gan': {
         'labels':[
